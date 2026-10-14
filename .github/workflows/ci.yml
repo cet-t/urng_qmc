@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+# urng_qmc depends on urng_qmc_core by path (../urng_qmc_core), so every job checks out
+# both repositories side by side. urng_qmc_core is taken from the branch with the same
+# name when it exists, otherwise from its default branch.
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: urng_qmc
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: urng_qmc
+      - id: core
+        working-directory: .
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/cet-t/urng_qmc_core "refs/heads/$BRANCH" > /dev/null; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        with:
+          repository: cet-t/urng_qmc_core
+          ref: ${{ steps.core.outputs.ref }}
+          path: urng_qmc_core
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: thumbv7em-none-eabihf
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - run: cargo build --target thumbv7em-none-eabihf
+
+  msrv:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: urng_qmc
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: urng_qmc
+      - id: core
+        working-directory: .
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/cet-t/urng_qmc_core "refs/heads/$BRANCH" > /dev/null; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        with:
+          repository: cet-t/urng_qmc_core
+          ref: ${{ steps.core.outputs.ref }}
+          path: urng_qmc_core
+      - uses: dtolnay/rust-toolchain@1.86
+      - run: cargo check
+
+  generated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy scipy
+      - run: python3 tools/gen_rd.py --check
+      - run: python3 tools/gen_sobol.py --scipy --check
+      - run: python3 tools/gen_vectors.py --check

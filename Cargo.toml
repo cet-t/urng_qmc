@@ -1,0 +1,17 @@
+[package]
+name = "urng_qmc"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.86"
+keywords = ["no_std", "qmc", "sobol", "low-discrepancy"]
+categories = ["no-std", "algorithms", "mathematics"]
+description = "Quasi-random (low-discrepancy) sequences for urng_core: Weyl, R_d, van der Corput, Sobol"
+readme = "crates-readme.md"
+authors = ["cet"]
+repository = "https://github.com/cet-t/urng_qmc"
+license = "MIT OR Apache-2.0"
+exclude = ["/.github", "/docs", "/tools"]
+
+[dependencies]
+urng_core = "0.1"
+urng_qmc_core = { version = "0.1", path = "../urng_qmc_core" }

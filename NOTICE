@@ -1,0 +1,14 @@
+urng_qmc
+Copyright (c) 2026 cet
+Licensed under either of the Apache License, Version 2.0 or the MIT license, at your option.
+
+This crate embeds the Sobol direction numbers `new-joe-kuo-6.21201` (src/sobol/table.rs) by
+Frances Y. Kuo and Stephen Joe:
+
+    S. Joe and F. Y. Kuo, "Constructing Sobol sequences with better two-dimensional
+    projections", SIAM J. Sci. Comput. 30 (2008), 2635-2654.
+    https://web.maths.unsw.edu.au/~fkuo/sobol/
+
+TODO before publishing: copy the copyright notice and license text that accompany the
+direction numbers on the page above verbatim into this file. The table was generated from the
+copy bundled with SciPy because the page could not be reached at the time.
