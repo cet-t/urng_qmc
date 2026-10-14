@@ -75,6 +75,23 @@ let mut rng = AsRng::new(Sobol32::<1>::new());
 let _: f32 = rng.nextf();
 ```
 
+## Performance
+
+Time per `next_point` from `cargo bench` (criterion, median). Reference values only: a shared 2.1 GHz Xeon VM, rustc 1.97, `--release`.
+
+| Sequence | D = 1 | D = 2 | D = 8 | D = 32 |
+| --- | --- | --- | --- | --- |
+| `Weyl64` | 0.83 ns | | | |
+| `VanDerCorput64` | 2.2 ns | | | |
+| `Rd64` | 0.92 ns | 1.3 ns | 3.8 ns | |
+| `Sobol64` | 1.0 ns | 2.8 ns | 4.6 ns | 15 ns |
+| `Sobol32` | | | | 7.6 ns |
+| `Halton64` | 2.3 ns | 35 ns | 140 ns | 370 ns |
+| `Shifted<Rd64>` | | | 3.2 ns | |
+| `DigitalShifted<Sobol64>` | | | | 20 ns |
+
+`Sobol64::<32>::seek` takes about 190 ns. Halton computes every digit of the index in every base, so it slows down with the index and the dimension.
+
 ## Notes
 
 - **Not suitable for cryptographic use.**

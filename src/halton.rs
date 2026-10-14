@@ -41,10 +41,13 @@ const fn scale_table() -> [[u128; MAX_DIGITS]; HALTON_MAX_DIM] {
 /// short of the exact value by at most `(b - 1)` per digit: about `2^-118` in all. The top
 /// 32 or 64 bits are therefore the exact value rounded down, except within that distance
 /// below a multiple of the output resolution.
+///
+/// The base is a const parameter so that the digit loop divides by a constant (a multiply),
+/// which makes it several times faster than dividing by a runtime base.
 #[inline]
-fn radical_inverse(j: usize, mut n: u64) -> u128 {
-    let b = PRIMES[j];
-    let scale = &SCALE[j];
+fn radical_inverse_in<const J: usize>(mut n: u64) -> u128 {
+    let b = PRIMES[J];
+    let scale = &SCALE[J];
     let mut acc = 0;
     let mut k = 0;
     while n != 0 {
@@ -53,6 +56,20 @@ fn radical_inverse(j: usize, mut n: u64) -> u128 {
         k += 1;
     }
     acc
+}
+
+/// [`radical_inverse_in`] for coordinate `j` in `1..HALTON_MAX_DIM`.
+#[inline]
+fn radical_inverse(j: usize, n: u64) -> u128 {
+    macro_rules! dispatch {
+        ($($j:literal)*) => {
+            match j {
+                $($j => radical_inverse_in::<$j>(n),)*
+                _ => unreachable!(),
+            }
+        };
+    }
+    dispatch!(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31)
 }
 
 macro_rules! halton {

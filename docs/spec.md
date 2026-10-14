@@ -501,7 +501,7 @@ N = 1024 では D が上がると L2-star discrepancy の差は小さくなる�
 - 生成物の鮮度: `tools/gen_*.py --check`（`gen_sobol.py` と `gen_vectors.py` は scipy を入れて実行）
 - `cargo +1.86 check` で MSRV を確認
 - `urng_qmc_core` の公開後は `cargo semver-checks` も回す（初回は比較元がないので対象外）
-- ベンチマーク（criterion）: 1 点あたりの ns を D = 1/2/8/32 で計測し、README に載せる（v0.1 公開前までに追加）
+- ベンチマーク（criterion、`benches/points.rs`）: 1 点あたりの ns を D = 1/2/8/32 で計測し、README に載せる。CI では `cargo bench --no-run` でビルドだけ確かめる
 
 ## 9. ロードマップ
 
@@ -521,8 +521,8 @@ v0.1 は最初の 3 列（Weyl・R2・Sobol 1 次元）から着手し、トレ�
 
 **公開前の残作業**
 
+- 段階ごとに公開するか、まとめて 0.1.0 にするかを決める（現状の版はどちらも 0.1.0）
 - Joe–Kuo の方向数のライセンス原文を配布元で確認し、`NOTICE` に転記する（レビュー時は配布元サイトに接続できなかったため、scipy 同梱の同一データから表を生成した）
-- criterion ベンチマークを追加する
 
 ## 10. 参考文献
 

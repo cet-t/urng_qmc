@@ -21,5 +21,12 @@ default = []
 # SobolWide32/64: Sobol with all 21201 Joe-Kuo dimensions (Sobol32/64 stop at 1024).
 sobol-21201 = []
 
+[dev-dependencies]
+criterion = "0.8.2"
+
+[[bench]]
+name = "points"
+harness = false
+
 [package.metadata.docs.rs]
 all-features = true
