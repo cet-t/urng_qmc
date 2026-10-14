@@ -4,7 +4,7 @@ mod common;
 
 use std::f64::consts::PI;
 
-use urng_qmc::{DigitalShifted, QuasiRng, Rd64, Shifted, Sobol64};
+use urng_qmc::{DigitalShifted, Halton64, QuasiRng, Rd64, Shifted, Sobol64};
 
 use common::{SplitMix64, l2_star, l2_star_random, slope, units};
 
@@ -24,6 +24,21 @@ fn l2_star_discrepancy() {
         ("R_d D=4", discrepancy_ratio(Rd64::<4>::new(), n), 0.95),
         ("Sobol D=8", discrepancy_ratio(Sobol64::<8>::new(), n), 0.85),
         ("R_d D=8", discrepancy_ratio(Rd64::<8>::new(), n), 1.03),
+        (
+            "Halton D=2",
+            discrepancy_ratio(Halton64::<2>::new(), n),
+            0.25,
+        ),
+        (
+            "Halton D=4",
+            discrepancy_ratio(Halton64::<4>::new(), n),
+            0.35,
+        ),
+        (
+            "Halton D=8",
+            discrepancy_ratio(Halton64::<8>::new(), n),
+            1.37,
+        ),
     ];
     for (name, ratio, limit) in cases {
         eprintln!("{name}: {ratio:.3} of random (limit {limit})");

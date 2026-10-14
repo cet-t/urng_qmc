@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+mod halton;
 mod rd;
 mod scramble;
 mod sobol;
@@ -11,6 +12,7 @@ mod weyl;
 
 pub use urng_qmc_core::*;
 
+pub use crate::halton::{HALTON_MAX_DIM, Halton32, Halton64};
 pub use crate::rd::{RD_MAX_DIM, Rd32, Rd64};
 pub use crate::scramble::{DigitalShifted, Shifted};
 pub use crate::sobol::{SOBOL_MAX_DIM, Sobol32, Sobol64};
