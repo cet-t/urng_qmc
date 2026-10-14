@@ -10,9 +10,9 @@ checksum = "2ee67f1008b1ba2321834326597b8e186293b049a023cdef258527550b9935b4"
 
 [[package]]
 name = "urng_core"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a98f62dbd83f703b82c422ba5a39a3d5502ff8de0a99bdf534dcc287e517a545"
+checksum = "1c774a2094c5625bdedf13f241a26437c00640ab78c2cb66093fa82410c9473d"
 dependencies = [
  "pastey",
 ]

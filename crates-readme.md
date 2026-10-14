@@ -16,13 +16,13 @@ Every type implements `QuasiRng<D>` and `Seek`. The van der Corput and Sobol typ
 ## Usage
 
 ```rust
-use urng_qmc::{QuasiRng, Sobol32};
+use urng_qmc::{QuasiRng, Sobol64};
 
 // Estimate π with 2^16 points.
-let mut q = Sobol32::<2>::new();
+let mut q = Sobol64::<2>::new();
 let mut inside = 0u32;
 for _ in 0..(1 << 16) {
-    let [x, y] = q.next_point_f(); // [f32; 2] in [0, 1)
+    let [x, y] = q.next_point_f(); // [f64; 2] in [0, 1)
     if x * x + y * y < 1.0 {
         inside += 1;
     }

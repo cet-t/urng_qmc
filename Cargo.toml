@@ -13,5 +13,5 @@ license = "MIT OR Apache-2.0"
 exclude = ["/.github", "/docs", "/tools"]
 
 [dependencies]
-urng_core = "0.1"
+urng_core = "0.1.2"
 urng_qmc_core = { version = "0.1", path = "../urng_qmc_core" }

@@ -26,8 +26,7 @@ impl SplitMix64 {
 
 /// The fixed-point word as a float in `[0, 1)`, computed exactly from the top 53 bits.
 ///
-/// The tests convert with this rather than `urng_core::Word::to_float`, whose `u64`
-/// version drops the top bit in urng_core 0.1.1.
+/// Independent of `urng_core::Word::to_float`, so the quality tests do not depend on it.
 pub fn unit<W: QmcWord>(x: W) -> f64 {
     let top = x.to_u64() << (64 - W::BITS);
     (top >> 11) as f64 * (-53f64).exp2()

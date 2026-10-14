@@ -160,12 +160,34 @@ fn sobol_spec_reference_points() {
 }
 
 #[test]
-#[ignore = "urng_core 0.1.1 drops the top bit in u64::to_float; re-enable once urng_core 0.1.2 is required"]
 fn sobol64_next_point_f() {
     let mut q = Sobol64::<2>::new();
     let _ = q.next_point();
     assert_eq!(q.next_point_f(), [0.5, 0.5]);
     assert_eq!(q.next_point_f(), [0.75, 0.25]);
+}
+
+/// urng_core 0.1.1 dropped the top bit of a `u64` in `to_float`; 0.1.2 is required.
+#[test]
+fn u64_floats_use_the_top_52_bits() {
+    let mut q = Sobol64::<4>::new();
+    let mut raw = q.clone();
+    for _ in 0..1000 {
+        let words = raw.next_point();
+        assert_eq!(
+            q.next_point_f(),
+            words.map(|x| (x >> 12) as f64 * (-52f64).exp2())
+        );
+    }
+    let mut q = Sobol32::<4>::new();
+    let mut raw = q.clone();
+    for _ in 0..1000 {
+        let words = raw.next_point();
+        assert_eq!(
+            q.next_point_f(),
+            words.map(|x| (x >> 9) as f32 * (-23f32).exp2())
+        );
+    }
 }
 
 #[test]
