@@ -212,12 +212,12 @@ fn sobol_matches_scipy_d8() {
 fn sobol_matches_scipy_d1024_checksums() {
     assert_eq!(SOBOL_MAX_DIM, 1024);
     let mut q = Sobol32::<1024>::new();
-    let mut sums = [0u32; 1024];
+    let mut sums = [0u64; 1024];
     let mut p = [0u32; 1024];
     for _ in 0..vectors::POINTS {
         q.fill_point(&mut p);
         for (h, x) in sums.iter_mut().zip(p) {
-            *h = h.rotate_left(5) ^ x;
+            *h = common::mix(*h, x.into());
         }
     }
     for (d, (got, want)) in sums

@@ -31,6 +31,14 @@ impl urng_core::Rng for SplitMix64 {
     }
 }
 
+/// `splitmix64_finalizer(h ^ x)`, the checksum step of tools/gen_vectors.py.
+pub fn mix(h: u64, x: u64) -> u64 {
+    let mut z = h ^ x;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
 /// The fixed-point word as a float in `[0, 1)`, computed exactly from the top 53 bits.
 ///
 /// Independent of `urng_core::Word::to_float`, so the quality tests do not depend on it.

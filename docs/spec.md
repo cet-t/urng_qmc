@@ -89,7 +89,7 @@ urng_qmc_core = { version = "0.1", path = "../urng_qmc_core" }
 
 [features]
 default = []
-# v0.3: sobol-21201 = []   # Joe–Kuo 全次元（5.4 参照）
+sobol-21201 = []   # SobolWide32/64（Joe–Kuo 全 21201 次元）を足す（5.4 参照）
 ```
 
 - `path` はローカル開発用。`cargo publish` 時は `path` が外れて `version` だけが残るので、`urng_qmc_core` を先に公開する
@@ -122,7 +122,9 @@ urng_qmc/
 │  ├─ vdc.rs               // VanDerCorput32/64
 │  ├─ sobol/
 │  │  ├─ mod.rs            // Sobol32<D>, Sobol64<D>
-│  │  └─ table.rs          // Joe–Kuo パラメータ（生成物、手で編集しない）
+│  │  ├─ wide.rs           // SobolWide32<D>, SobolWide64<D>（sobol-21201）
+│  │  ├─ table.rs          // Joe–Kuo パラメータ 1024 次元（生成物、手で編集しない）
+│  │  └─ table_21201.rs    // 同 全 21201 次元（生成物、sobol-21201 のときだけ使う）
 │  ├─ halton.rs            // Halton32<D>, Halton64<D>（v0.3）
 │  └─ scramble.rs          // Shifted, DigitalShifted（v0.2）
 ├─ tests/                  // 結合テスト（std 可）。既知値・層別・discrepancy・収束
@@ -238,7 +240,8 @@ impl<Q: Seek> Seek for AsRng<Q> { /* 委譲 */ }
 | `Weyl32`, `Weyl64` | 1 | あり | なし | v0.1 |
 | `Rd32<D>`, `Rd64<D>` | 1〜16 | あり | なし | v0.1 |
 | `VanDerCorput32`, `VanDerCorput64` | 1 | あり | あり | v0.1 |
-| `Sobol32<D>`, `Sobol64<D>` | 1〜1024（v0.3 で feature により 21201） | あり | あり | v0.1 |
+| `Sobol32<D>`, `Sobol64<D>` | 1〜1024 | あり | あり | v0.1 |
+| `SobolWide32<D>`, `SobolWide64<D>` | 1〜21201（feature `sobol-21201`） | あり | あり | v0.3 |
 | `Shifted<Q, D>` | Q に従う | Q が実装すれば | なし | v0.2 |
 | `DigitalShifted<Q, D>` | Q に従う | Q が実装すれば | あり | v0.2 |
 | `Halton32<D>`, `Halton64<D>` | 1〜32 | あり | なし | v0.3 |
@@ -374,8 +377,15 @@ fn next_point(&mut self) -> [u64; D] {
 
 **次元の上限**
 
-- v0.1 は表に 1024 次元（次数 s ≤ 13）を持ち、feature なしで `D ≤ 1024` を受け付ける
-- v0.3 の `sobol-21201` feature は全次元の表を足す。数千次元を超えると `const` 評価が deny 既定の `long_running_const_eval` リントに当たる（21201 次元で確認）ので、V の定義に `#[allow(long_running_const_eval)]` を付ける。D = 21201 では `next_point` の戻り値が 170 KB になるので、利用者には `fill_point` を勧める
+- `Sobol32/64<D>` は表に 1024 次元（次数 s ≤ 13）を持ち、feature なしで `D ≤ 1024` を受け付ける
+- D ごとに表全体を 1 回の `const` 評価で作る方式は、数千次元で deny 既定の `long_running_const_eval` リントに当たる（u64 で D = 2048 は通り、4096 で止まる）。しかもこのリントの許可レベルは、評価を実体化したクレート（利用者側）のルートで決まる（評価中のフレームが他クレートのものだと、レベルを判定する場所がクレートルートに落ちるため）。V や `build` に `#[allow]` を付けても効かず、利用者に `#![allow(long_running_const_eval)]` を書かせることになる
+- そこで `sobol-21201` feature では別の型 `SobolWide32/64<D>` を足す。feature は型を足すだけなので加算的で、`Sobol32/64` の挙動は変わらない
+  - 方向数を 256 次元ずつのチャンクに分け、チャンクごとに別の関連 const（`Chunk::<C>::V64`）にする。1 回の評価がリントの上限に届かない
+  - 型ごとのチャンク表 `CHUNKS` は `SobolWide<D>` の関連 const で、`ceil(D/256)` 個のチャンクだけを評価し、残りはゼロのチャンクで埋める。チャンクは関数呼び出し越しに参照する（初期化式に const を直接書くと、通らない分岐の分まで評価されるため）
+  - ジェネリックでない const は定義側のクレートで必ず評価されるので、チャンク表を自由な const にしてはいけない（試作では feature を有効にしただけで `urng_qmc` のビルドが約 200 秒延びた）
+  - 実測のビルド時間: feature を有効にして `SobolWide` を使わない場合は増えない。`SobolWide64<3000>` は 8 秒、全 21201 次元を両方の幅で使うテストは約 2 分。バイナリに入るのは使うチャンクだけ
+  - 更新はチャンクごとに V\[c\] の行を XOR する。`D ≤ 1024` では `Sobol32/64` と同じ点を返す（テストで確認）
+- D = 21201 では `next_point` の戻り値が 170 KB になるので、`fill_point` を勧める
 
 ### 5.5 Halton（`Halton32<D>` / `Halton64<D>`、v0.3）
 
@@ -456,7 +466,7 @@ pub trait DigitalNet<const D: usize>: QuasiRng<D> {}
 
 | 種類 | 内容 | 対象 | 合格条件 |
 | --- | --- | --- | --- |
-| 既知値 | 先頭の点を参照値と比較 | 全列 | ビット単位で一致。Sobol32 は `scipy.stats.qmc.Sobol(scramble=False, bits=32)` の出力（2^32 倍すると整数として厳密）を `tools/gen_vectors.py` で埋め込む。D = 8 の先頭 256 点と、D = 1024 の先頭 256 点の次元ごとチェックサム |
+| 既知値 | 先頭の点を参照値と比較 | 全列 | ビット単位で一致。Sobol32 は `scipy.stats.qmc.Sobol(scramble=False, bits=32)` の出力（2^32 倍すると整数として厳密）を `tools/gen_vectors.py` で埋め込む。D = 8 の先頭 256 点と、D = 1024 の先頭 256 点の次元ごとチェックサム（`SobolWide` は 21201 次元分を畳み込んだ 1 値）。Halton は分数で厳密に求めた ⌊φ\_b(n)·2^B⌋（scipy と照合）と 24 個のインデックスで一致 |
 | 幅の整合 | `Sobol64` の上位 32 bit = `Sobol32` | Sobol | D = 1024 の先頭 4096 点で一致（漸化式は右シフトだけなので理論上一致する） |
 | 定数表 | R\_d の α が奇数、f64 で計算した φ\_D^-j·2^B と相対誤差 2^-48 以内（f64 の丸めが j 回積もるため。誤った行の検出用）、5.2 の表と一致 | R\_d | 全 D で成立。80 桁精度での照合は `gen_rd.py` の自己テストで行う |
 | seek 一致 | `seek(n)` 後の状態 = n 回逐次更新した状態 | 全列 + ラッパー | 上限 L 未満の n = 0, 1, 2^k−1, 2^k と乱数 32 個で一致。L = 2^16（`Sobol<1024>` は 2^10） |
@@ -464,18 +474,21 @@ pub trait DigitalNet<const D: usize>: QuasiRng<D> {}
 | 周期 | `seek(2^B − 1)` から 1 点進めると点 0 に戻る | 全列 | 状態が `new()` と一致 |
 | 1 次元層別 | 先頭 2^m 点が \[k/2^m, (k+1)/2^m) に 1 個ずつ | VdC、Sobol 各次元 | VdC と Sobol 先頭 64 次元は m = 1〜16、Sobol 全 1024 次元は m = 1〜12 |
 | 2 次元層別 | 2^m 点のブロック（先頭から最大 4 個）が 2^a × 2^(m−a) の全格子に 1 個ずつ（t = 0） | Sobol の次元 1・2 | m = 1〜12、全 a |
+| b 進格子 | 先頭 b^m 点が i/b^m（1 単位以内）に 1 個ずつ | Halton 全 32 次元 | b^m ≤ 4096 |
 | スクランブル保存 | XOR シフト後も上の 2 次元層別が成立 | `DigitalShifted<Sobol>`（v0.2） | シード 10 種で成立 |
-| discrepancy | L2-star discrepancy（Warnock の式、O(N²D)）を、一様乱数の期待値 √((2^-D − 3^-D)/N) と比べる | R\_d、Sobol（v0.3 で Halton） | N = 1024。D = 2 では両列とも期待値の 1/4 以下。D = 4/8 は退行検知として下表の閾値以下 |
+| discrepancy | L2-star discrepancy（Warnock の式、O(N²D)）を、一様乱数の期待値 √((2^-D − 3^-D)/N) と比べる | R\_d、Sobol、Halton | N = 1024。D = 2 では両列とも期待値の 1/4 以下。D = 4/8 は退行検知として下表の閾値以下 |
 | 収束次数 | ∏(π/2)·sin(πx\_j)（積分値 1）を D = 2 で計算し、16 個のランダムシフト（Sobol は `DigitalShifted`、R\_d は `Shifted`）の RMSE を N = 2^8〜2^16 で求め、両対数の傾きを推定 | Sobol、R\_d | 傾き < −0.8（擬似乱数は約 −0.5） |
 | 範囲外の次元 | `Sobol64::<0>::new()`、`Rd64::<17>::new()` など | Sobol、R\_d | `compile_fail` doctest |
 
-**discrepancy の閾値**（一様乱数の期待値との比。実測は scipy と同じ点列で D = 2: Sobol 0.075 / R\_d 0.118、D = 4: 0.201 / 0.762、D = 8: 0.672 / 0.824。実測に約 25% の余裕を足した値）
+**discrepancy の閾値**（一様乱数の期待値との比。実測は scipy と同じ点列で D = 2: Sobol 0.075 / R\_d 0.118 / Halton 0.141、D = 4: 0.201 / 0.762 / 0.275、D = 8: 0.672 / 0.824 / 1.092。実測に約 25% の余裕を足した値）
 
-| D | Sobol | R\_d |
-| --- | --- | --- |
-| 2 | 0.25 | 0.25 |
-| 4 | 0.25 | 0.95 |
-| 8 | 0.85 | 1.03 |
+| D | Sobol | R\_d | Halton |
+| --- | --- | --- | --- |
+| 2 | 0.25 | 0.25 | 0.25 |
+| 4 | 0.25 | 0.95 | 0.35 |
+| 8 | 0.85 | 1.03 | 1.37 |
+
+チェックサムは SplitMix64 の finalizer で `h = mix(h ^ x)` とする。XOR と回転だけのチェックサムは、デジタルネットの XOR 構造で 32 点周期に打ち消し合い、Sobol の全次元で 0 になる（方向数が誤っていても検出できない）。乗算型（FNV）も、先頭の点のように下位ビットがすべて 0 の値を区別できない。`gen_vectors.py` は、異なる列が異なるチェックサムになることを確かめてから書き出す。表の 1 次元を壊すと、テストがその次元を指して失敗することも確認した
 
 N = 1024 では D が上がると L2-star discrepancy の差は小さくなる（D = 8 の Halton は乱数の期待値を上回る）。「1/4 以下」を全 D に課すと正しい実装でも落ちるので、D = 4/8 は性能の主張ではなく退行検知と位置づける。
 
@@ -483,6 +496,7 @@ N = 1024 では D が上がると L2-star discrepancy の差は小さくなる�
 
 - `cargo test`（両クレート、u32 / u64 両方）。`urng_qmc` は両リポジトリを兄弟ディレクトリに checkout して実行する
 - `cargo clippy --all-targets -- -D warnings`、`cargo fmt --check`、`cargo doc`（`-D warnings`）
+- `cargo test --features sobol-21201`（全次元のテストに約 2 分）
 - `cargo build --target thumbv7em-none-eabihf` で `no_std` ビルドを確認
 - 生成物の鮮度: `tools/gen_*.py --check`（`gen_sobol.py` と `gen_vectors.py` は scipy を入れて実行）
 - `cargo +1.86 check` で MSRV を確認
@@ -498,10 +512,12 @@ v0.1 で Weyl・R\_d・van der Corput・Sobol（1024 次元まで）を持つ ur
 | core 0.1 | `QmcWord`、`QuasiRng`、`Seek`、`DigitalNet`、`AsRng` | v0.1 の全列と v0.2 のラッパーの試作がこのトレイトだけで書けること |
 | v0.1 | Weyl、R\_d、VdC、Sobol（≤ 1024） | 第 8 章の v0.1 対象テストが全て通る |
 | v0.2 | `Shifted`、`DigitalShifted` | スクランブル保存と seek 一致が通る |
-| v0.3 | Halton、`sobol-21201` | Halton の既知値と discrepancy が通る |
+| v0.3 | Halton、`SobolWide`（`sobol-21201`） | Halton の既知値と discrepancy、全次元のチェックサムが通る |
 | v0.4（候補） | Owen スクランブル | 需要を見て決める |
 
 v0.1 は最初の 3 列（Weyl・R2・Sobol 1 次元）から着手し、トレイト設計を最小コストで検証する。core は公開すると破壊的変更が高くつくので、v0.2 のラッパーを試作して `QmcWord` の過不足を確かめてから 0.1 を公開する。
+
+**現状**: v0.1〜v0.3 の実装とテストは揃っている（クレートの版はどちらも 0.1.0 のまま）。v0.2 のラッパーは core に手を入れずに書けたので、core 0.1 の公開条件は満たしている。段階ごとに公開するか、まとめて 0.1.0 にするかは公開時に決める。
 
 **公開前の残作業**
 
@@ -533,6 +549,7 @@ v0.1 は最初の 3 列（Weyl・R2・Sobol 1 次元）から着手し、トレ�
 | 4 | Sobol の V を `&'static [[W; D]; B]` にした | 値の const だと debug で 512 KB のフレームとループ内 `memcpy`（D = 1024） |
 | 5 | Sobol の次元上限を feature なしで 1024 に、`sobol-1024` feature を削除 | パラメータ表は const 評価専用でバイナリに入らない。v0.1 の Cargo.toml に v0.3 の feature があった不整合も解消 |
 | 6 | `sobol-21201` に `long_running_const_eval` の allow と `fill_point` を追加 | 21201 次元の const 評価はリントでエラーになる。戻り値 170 KB |
+| 6' | 6 を撤回し、`SobolWide32/64` を feature で足す形に変更（5.4） | 実装してみると `#[allow]` は効かなかった。リントは利用者側のクレートで判定される。チャンク分割と遅延評価で、利用者が何も書かずに全次元を使える |
 | 7 | Halton の 64 bit 計算を u128 累積に変更 | 「最大 64 ulp」は誤り。上限は (b−1)·K で基底 131 は 1300 ulp、実測 559 ulp |
 | 8 | Weyl の状態に `seed` を追加 | `seek` が s₀ を使うのに状態になかった |
 | 9 | `Weyl::new` の偶数 α を常に補正に変更 | debug と release で挙動が違うと、release の経路をテストで通せない |
@@ -549,3 +566,4 @@ v0.1 は最初の 3 列（Weyl・R2・Sobol 1 次元）から着手し、トレ�
 | 20 | `DigitalShifted` も `DigitalNet` を実装、全型に `Default` | スクランブルの重ね掛け、clippy の `new_without_default` |
 | 21 | テストを `src/tests/` から `tests/` に移動 | `no_std` クレートの `src` 内では `std` を使うのに `extern crate std` が要る |
 | 22 | Joe–Kuo 方向数の著作権表示を `NOTICE` に置く | 方向数は BSD 系の著作権表示付きで配布されていると記憶している（配布元に接続できず未確認）。MIT / Apache のクレートに埋め込むなら表示が要る |
+| 23 | チェックサムを SplitMix64 の finalizer に変更（8 章） | 初版の XOR/回転型は Sobol で全次元 0 になり、1024 次元の照合テストが何も検査していなかった |

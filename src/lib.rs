@@ -16,6 +16,8 @@ pub use crate::halton::{HALTON_MAX_DIM, Halton32, Halton64};
 pub use crate::rd::{RD_MAX_DIM, Rd32, Rd64};
 pub use crate::scramble::{DigitalShifted, Shifted};
 pub use crate::sobol::{SOBOL_MAX_DIM, Sobol32, Sobol64};
+#[cfg(feature = "sobol-21201")]
+pub use crate::sobol::{SOBOL_WIDE_MAX_DIM, SobolWide32, SobolWide64};
 pub use crate::vdc::{VanDerCorput32, VanDerCorput64};
 pub use crate::weyl::{Weyl32, Weyl64};
 

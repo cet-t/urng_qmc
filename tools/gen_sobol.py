@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Generate src/sobol/table.rs from the Joe-Kuo direction numbers.
+"""Generate src/sobol/table.rs (1024 dimensions) and src/sobol/table_21201.rs (all
+21201, behind the `sobol-21201` feature) from the Joe-Kuo direction numbers.
 
 The source is either the original file `new-joe-kuo-6.21201` from
 https://web.maths.unsw.edu.au/~fkuo/sobol/ or the same data bundled with SciPy
@@ -9,7 +10,7 @@ https://web.maths.unsw.edu.au/~fkuo/sobol/ or the same data bundled with SciPy
     python3 tools/gen_sobol.py --scipy
     python3 tools/gen_sobol.py --scipy --check     # fail if the file is out of date
 
-Dimension 1 is implicit (all m_k = 1). The table lists dimensions 2..=MAX_DIM as
+Dimension 1 is implicit (all m_k = 1). Each table lists dimensions 2..=MAX_DIM as
 (s, a, [m_1, ..., m_s, 0, ...]) in Joe-Kuo notation.
 """
 
@@ -17,7 +18,8 @@ import argparse
 import pathlib
 import sys
 
-OUT = pathlib.Path(__file__).resolve().parent.parent / "src" / "sobol" / "table.rs"
+SRC = pathlib.Path(__file__).resolve().parent.parent / "src" / "sobol"
+OUTPUTS = {SRC / "table.rs": 1024, SRC / "table_21201.rs": 21201}
 
 # The first rows of new-joe-kuo-6.21201 (d, s, a, m_1..m_s), used to check either source.
 KNOWN = [
@@ -109,21 +111,21 @@ def main() -> int:
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--joe-kuo", type=pathlib.Path, help="path to new-joe-kuo-6.21201")
     src.add_argument("--scipy", action="store_true", help="read the copy bundled with SciPy")
-    ap.add_argument("--max-dim", type=int, default=1024)
-    ap.add_argument("--check", action="store_true", help="fail if the table is out of date")
+    ap.add_argument("--check", action="store_true", help="fail if a table is out of date")
     args = ap.parse_args()
 
     rows = from_scipy() if args.scipy else from_joe_kuo(args.joe_kuo)
     check(rows)
-    # Both sources hold the same data, so the header names the original file either way.
-    text = render(rows, args.max_dim, "new-joe-kuo-6.21201")
-    if args.check:
-        if OUT.read_text() != text:
-            print(f"{OUT} is out of date; run tools/gen_sobol.py", file=sys.stderr)
-            return 1
-        return 0
-    OUT.write_text(text)
-    return 0
+    stale = False
+    for path, max_dim in OUTPUTS.items():
+        # Both sources hold the same data, so the header names the original file either way.
+        text = render(rows, max_dim, "new-joe-kuo-6.21201")
+        if not args.check:
+            path.write_text(text)
+        elif not path.exists() or path.read_text() != text:
+            print(f"{path} is out of date; run tools/gen_sobol.py", file=sys.stderr)
+            stale = True
+    return 1 if stale else 0
 
 
 if __name__ == "__main__":
