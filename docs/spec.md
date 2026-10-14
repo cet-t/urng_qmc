@@ -397,8 +397,12 @@ pub struct DigitalShifted<Q, const D: usize> where Q: DigitalNet<D> { inner: Q, 
 
 impl<Q: QuasiRng<D>, const D: usize> Shifted<Q, D> {
     pub fn new<R: Rng + ?Sized>(inner: Q, rng: &mut R) -> Self where R::Word: QmcWord;
-    pub fn with_shift(inner: Q, shift: [Q::Word; D]) -> Self;
+    pub const fn with_shift(inner: Q, shift: [Q::Word; D]) -> Self;
+    pub const fn shift(&self) -> &[Q::Word; D];
+    pub const fn get_ref(&self) -> &Q;
+    pub fn into_inner(self) -> Q;
 }
+// DigitalShifted も同じ形（new / with_mask / mask / get_ref / into_inner）
 
 /// デジタルネット（基底 2）である列のマーカー。定義は urng_qmc_core。
 /// urng_qmc では Sobol と van der Corput が実装し、外部の列も実装できる。
@@ -443,7 +447,7 @@ pub trait DigitalNet<const D: usize>: QuasiRng<D> {}
 
 ### 7.2 型の性質
 
-- 全型 `Clone + Debug + PartialEq + Eq + Default`、自動で `Send + Sync`。`Copy` は付けない。暗黙のコピーで同じ点列が 2 本作られるのを防ぐため
+- 全型 `Clone + Debug + PartialEq + Eq`、列の型は `Default` も実装する（ラッパーはシフト量が要るので `Default` なし）。自動で `Send + Sync`。`Copy` は付けない。暗黙のコピーで同じ点列が 2 本作られるのを防ぐため
 - `PartialEq` は状態の比較として実装し、テストで `seek` と逐次更新の一致を確かめるのに使う
 
 ## 8. テストと検証
@@ -462,7 +466,7 @@ pub trait DigitalNet<const D: usize>: QuasiRng<D> {}
 | 2 次元層別 | 2^m 点のブロック（先頭から最大 4 個）が 2^a × 2^(m−a) の全格子に 1 個ずつ（t = 0） | Sobol の次元 1・2 | m = 1〜12、全 a |
 | スクランブル保存 | XOR シフト後も上の 2 次元層別が成立 | `DigitalShifted<Sobol>`（v0.2） | シード 10 種で成立 |
 | discrepancy | L2-star discrepancy（Warnock の式、O(N²D)）を、一様乱数の期待値 √((2^-D − 3^-D)/N) と比べる | R\_d、Sobol（v0.3 で Halton） | N = 1024。D = 2 では両列とも期待値の 1/4 以下。D = 4/8 は退行検知として下表の閾値以下 |
-| 収束次数 | ∏(π/2)·sin(πx\_j)（積分値 1）を D = 2 で計算し、16 個のランダムシフト（Sobol は XOR、R\_d は加算）の RMSE を N = 2^8〜2^16 で求め、両対数の傾きを推定 | Sobol、R\_d | 傾き < −0.8（擬似乱数は約 −0.5） |
+| 収束次数 | ∏(π/2)·sin(πx\_j)（積分値 1）を D = 2 で計算し、16 個のランダムシフト（Sobol は `DigitalShifted`、R\_d は `Shifted`）の RMSE を N = 2^8〜2^16 で求め、両対数の傾きを推定 | Sobol、R\_d | 傾き < −0.8（擬似乱数は約 −0.5） |
 | 範囲外の次元 | `Sobol64::<0>::new()`、`Rd64::<17>::new()` など | Sobol、R\_d | `compile_fail` doctest |
 
 **discrepancy の閾値**（一様乱数の期待値との比。実測は scipy と同じ点列で D = 2: Sobol 0.075 / R\_d 0.118、D = 4: 0.201 / 0.762、D = 8: 0.672 / 0.824。実測に約 25% の余裕を足した値）

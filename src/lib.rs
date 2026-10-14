@@ -4,6 +4,7 @@
 #![warn(missing_docs)]
 
 mod rd;
+mod scramble;
 mod sobol;
 mod vdc;
 mod weyl;
@@ -11,6 +12,7 @@ mod weyl;
 pub use urng_qmc_core::*;
 
 pub use crate::rd::{RD_MAX_DIM, Rd32, Rd64};
+pub use crate::scramble::{DigitalShifted, Shifted};
 pub use crate::sobol::{SOBOL_MAX_DIM, Sobol32, Sobol64};
 pub use crate::vdc::{VanDerCorput32, VanDerCorput64};
 pub use crate::weyl::{Weyl32, Weyl64};

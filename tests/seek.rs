@@ -4,8 +4,8 @@ use std::collections::BTreeSet;
 use std::fmt::Debug;
 
 use urng_qmc::{
-    AsRng, QmcWord, QuasiRng, Rd32, Rd64, Seek, Sobol32, Sobol64, VanDerCorput32, VanDerCorput64,
-    Weyl32, Weyl64,
+    AsRng, DigitalShifted, QmcWord, QuasiRng, Rd32, Rd64, Seek, Shifted, Sobol32, Sobol64,
+    VanDerCorput32, VanDerCorput64, Weyl32, Weyl64,
 };
 
 use common::SplitMix64;
@@ -128,6 +128,16 @@ fn sobol() {
     all(Sobol64::<8>::new(), LIMIT);
     all(Sobol32::<1024>::new(), 1 << 10);
     all(Sobol64::<1024>::new(), 1 << 10);
+}
+
+#[test]
+fn scrambled() {
+    let mut rng = SplitMix64(99);
+    all(Shifted::new(Weyl32::golden(), &mut rng), LIMIT);
+    all(Shifted::new(Rd64::<3>::new(), &mut rng), LIMIT);
+    all(Shifted::new(Sobol32::<4>::new(), &mut rng), LIMIT);
+    all(DigitalShifted::new(VanDerCorput32::new(), &mut rng), LIMIT);
+    all(DigitalShifted::new(Sobol64::<8>::new(), &mut rng), LIMIT);
 }
 
 #[test]

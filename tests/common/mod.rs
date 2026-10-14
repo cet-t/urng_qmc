@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use urng_qmc::QmcWord;
+use urng_qmc::{QmcWord, QuasiRng};
 
 /// SplitMix64, a fixed-seed generator for reproducible tests.
 pub struct SplitMix64(pub u64);
@@ -21,6 +21,13 @@ impl SplitMix64 {
 
     pub fn word<W: QmcWord>(&mut self) -> W {
         W::from_index(self.next_u64() >> (64 - W::BITS))
+    }
+}
+
+impl urng_core::Rng for SplitMix64 {
+    type Word = u64;
+    fn nextu(&mut self) -> u64 {
+        self.next_u64()
     }
 }
 
@@ -72,4 +79,50 @@ pub fn slope(xs: &[f64], ys: &[f64]) -> f64 {
     let cov: f64 = xs.iter().zip(ys).map(|(x, y)| (x - mx) * (y - my)).sum();
     let var: f64 = xs.iter().map(|x| (x - mx) * (x - mx)).sum();
     cov / var
+}
+
+/// Top 16 bits of each coordinate of the first `2^m_max` points, one `Vec` per dimension.
+pub fn top_bits<Q: QuasiRng<D>, const D: usize>(mut q: Q, m_max: u32) -> Vec<Vec<u16>> {
+    let shift = Q::Word::BITS - 16;
+    let mut dims = vec![Vec::with_capacity(1 << m_max); D];
+    for _ in 0..1u32 << m_max {
+        for (d, x) in q.next_point().into_iter().enumerate() {
+            dims[d].push((x.to_u64() >> shift) as u16);
+        }
+    }
+    dims
+}
+
+/// For every `m <= m_max`, the first `2^m` values have distinct top `m` bits: one value in
+/// each interval `[k / 2^m, (k + 1) / 2^m)`.
+pub fn assert_1d_stratified(values: &[u16], m_max: u32, what: &str) {
+    for m in 1..=m_max {
+        let mut seen = vec![false; 1 << m];
+        for &v in &values[..1 << m] {
+            let cell = (v >> (16 - m)) as usize;
+            assert!(!seen[cell], "{what}: m={m}, two points in cell {cell}");
+            seen[cell] = true;
+        }
+    }
+}
+
+/// Dimensions 1 and 2 form a (0, 2)-sequence: every block of `2^m` points starting at a
+/// multiple of `2^m` has one point in each `2^a x 2^(m-a)` cell, for every `a`.
+pub fn assert_2d_t0(x: &[u16], y: &[u16], m_max: u32, what: &str) {
+    for m in 1..=m_max {
+        let blocks = (x.len() >> m).min(4);
+        for block in 0..blocks {
+            let range = block << m..(block + 1) << m;
+            for a in 0..=m {
+                let mut seen = vec![false; 1 << m];
+                for i in range.clone() {
+                    let cx = (u32::from(x[i]) >> (16 - a)) as usize;
+                    let cy = (u32::from(y[i]) >> (16 - (m - a))) as usize;
+                    let cell = (cx << (m - a)) | cy;
+                    assert!(!seen[cell], "{what}: m={m} a={a} block={block}");
+                    seen[cell] = true;
+                }
+            }
+        }
+    }
 }

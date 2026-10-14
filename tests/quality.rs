@@ -4,7 +4,7 @@ mod common;
 
 use std::f64::consts::PI;
 
-use urng_qmc::{QmcWord, QuasiRng, Rd64, Sobol64};
+use urng_qmc::{DigitalShifted, QuasiRng, Rd64, Shifted, Sobol64};
 
 use common::{SplitMix64, l2_star, l2_star_random, slope, units};
 
@@ -36,24 +36,22 @@ fn integrand<const D: usize>(p: [f64; D]) -> f64 {
     p.iter().map(|x| PI / 2.0 * (PI * x).sin()).product()
 }
 
-/// Slope of log2(RMSE) against log2(N) for N = 2^8..=2^16, over 16 random shifts.
-fn convergence_slope<Q, const D: usize>(fresh: Q, shift: fn(Q::Word, Q::Word) -> Q::Word) -> f64
+/// Slope of log2(RMSE) against log2(N) for N = 2^8..=2^16, over 16 randomized copies
+/// made by `scramble`.
+fn convergence_slope<Q, const D: usize>(scramble: impl Fn(&mut SplitMix64) -> Q) -> f64
 where
-    Q: QuasiRng<D> + Clone,
+    Q: QuasiRng<D>,
 {
     let ns: Vec<usize> = (8..=16).map(|m| 1 << m).collect();
     let mut sq_err = vec![0.0; ns.len()];
     let mut rng = SplitMix64(2026);
     let reps = 16;
     for _ in 0..reps {
-        let u: [Q::Word; D] = core::array::from_fn(|_| rng.word());
-        let mut q = fresh.clone();
+        let mut q = scramble(&mut rng);
         let mut sum = 0.0;
         let mut next = 0;
         for i in 1..=*ns.last().unwrap() {
-            let p = q.next_point();
-            let shifted: [Q::Word; D] = core::array::from_fn(|j| shift(p[j], u[j]));
-            sum += integrand(units(shifted));
+            sum += integrand(units(q.next_point()));
             if i == ns[next] {
                 sq_err[next] += (sum / i as f64 - 1.0).powi(2);
                 next += 1;
@@ -70,8 +68,8 @@ where
 
 #[test]
 fn integration_error_converges_faster_than_monte_carlo() {
-    let sobol = convergence_slope(Sobol64::<2>::new(), |x, u| x ^ u);
-    let rd = convergence_slope(Rd64::<2>::new(), QmcWord::wrapping_add);
+    let sobol = convergence_slope(|rng| DigitalShifted::new(Sobol64::<2>::new(), rng));
+    let rd = convergence_slope(|rng| Shifted::new(Rd64::<2>::new(), rng));
     eprintln!("RMSE slope: Sobol {sobol:.3}, R_d {rd:.3} (Monte Carlo is about -0.5)");
     assert!(sobol < -0.8, "Sobol slope {sobol:.3}");
     assert!(rd < -0.8, "R_d slope {rd:.3}");
